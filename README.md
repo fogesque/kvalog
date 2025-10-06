@@ -1,7 +1,3 @@
-# Kvalog: Unified C++ Logger
-
-A modern, header-only C++ logging library built on top of spdlog with flexible configuration and multiple output formats.
-
 # kvalog
 
 <p align="center">
