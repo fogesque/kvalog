@@ -95,6 +95,7 @@ fields.includeModuleName = true;   // Module name (some part of application)
 fields.includeLogLevel = true;     // Log level
 fields.includeFile = true;         // Source file name and line
 fields.includeMessage = true;      // Log message
+fields.includeTime = true;         // Time
 
 config.fields = fields;
 ```
@@ -103,19 +104,20 @@ config.fields = fields;
 
 #### Terminal Format
 ```
-[MyApp][NetworkModule][PID:12345][TID:67890][INF][main.cpp:42] Connection established
+[2025-10-06 21:58:46.529][MyApp][NetworkModule][PID:12345][TID:67890][INF][main.cpp:42] Connection established
 ```
 
 #### JSON Format
 ```json
 {
-  "app": "MyApp",
-  "process_id": 12345,
-  "thread_id": "67890",
-  "module": "NetworkModule",
-  "level": "INF",
-  "file": "main.cpp:42",
-  "message": "Connection established"
+  "app":        "MyApp",
+  "process_id": "12345",
+  "thread_id":  "67890",
+  "module":     "NetworkModule",
+  "level":      "INF",
+  "file":       "main.cpp:42",
+  "message":    "Connection established",
+  "time":       "2025-10-06 21:58:46.529"
 }
 ```
 
@@ -356,12 +358,12 @@ struct Config {
 ### Logger Methods
 
 ```cpp
-void trace(const std::string& module, const std::string& message);
-void debug(const std::string& module, const std::string& message);
-void info(const std::string& module, const std::string& message);
-void warning(const std::string& module, const std::string& message);
-void error(const std::string& module, const std::string& message);
-void critical(const std::string& module, const std::string& message);
+void trace(const std::string& message);
+void debug(const std::string& message);
+void info(const std::string& message);
+void warning(const std::string& message);
+void error(const std::string& message);
+void critical(const std::string& message);
 
 void flush();
 
