@@ -1,36 +1,80 @@
 {
-    "version": 2,
+    "version": 8,
     "configurePresets": [
         {
-            "name": "vcpkg",
-            "generator": "Ninja",
+            "name": "base",
+            "hidden": true,
             "binaryDir": "${sourceDir}/build",
             "cacheVariables": {
-                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/${presetName}"
             }
         },
         {
-            "name": "msvs",
-            "displayName": "Visual Studio",
-            "description": "Using compilers for Visual Studio",
-            "generator": "Visual Studio 17 2022",
-            "toolset": "host=x64",
-            "architecture": "x64",
-            "binaryDir": "${sourceDir}/build/${presetName}",
+            "name": "linux-base",
+            "hidden": true,
+            "inherits": [
+                "base"
+            ],
+            "generator": "Ninja",
             "cacheVariables": {
-                "CMAKE_INSTALL_PREFIX": "${sourceDir}/build/install/${presetName}",
-                "CMAKE_C_COMPILER": "cl.exe",
-                "CMAKE_CXX_COMPILER": "cl.exe",
-                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+                "CMAKE_C_COMPILER": "gcc-14",
+                "CMAKE_CXX_COMPILER": "g++-14"
             }
-        }
-    ],
-    "buildPresets": [
+        },
         {
-            "name": "msvs",
-            "displayName": "Visual Studio",
-            "configurePreset": "msvs",
-            "configuration": "Debug"
+            "name": "windows-base",
+            "hidden": true,
+            "inherits": [
+                "base"
+            ],
+            "generator": "Visual Studio 17 2022"
+        },
+        {
+            "name": "amd64-linux-release",
+            "displayName": "AMD64 Linux Release",
+            "inherits": [
+                "linux-base"
+            ],
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "amd64-linux-debug",
+            "displayName": "AMD64 Linux Debug",
+            "inherits": [
+                "linux-base"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BUILD_SAMPLES": "ON",
+                "VCPKG_MANIFEST_FEATURES": "samples"
+            }
+        },
+        {
+            "name": "amd64-windows-release",
+            "displayName": "AMD64 Windows Release",
+            "inherits": [
+                "windows-base"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "amd64-windows-debug",
+            "displayName": "AMD64 Windows Debug",
+            "inherits": [
+                "windows-base"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BUILD_SAMPLES": "ON",
+                "VCPKG_MANIFEST_FEATURES": "samples"
+            }
         }
     ]
 }
