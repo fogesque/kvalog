@@ -55,9 +55,9 @@ private:
     bool connected;
 };
 
-void exampleBasicUsage()
+void sampleBasicUsage()
 {
-    std::cout << "\n=== Basic Usage Example ===" << std::endl;
+    std::cout << "\n=== Basic Usage Sample ===" << std::endl;
 
     Logger::Config config;
     config.format = OutputFormat::Terminal;
@@ -75,9 +75,9 @@ void exampleBasicUsage()
     logger.error("Failed to connect to remote service");
 }
 
-void exampleJsonLogging()
+void sampleJsonLogging()
 {
-    std::cout << "\n=== JSON Format Example ===" << std::endl;
+    std::cout << "\n=== JSON Format Sample ===" << std::endl;
 
     Logger::Config config;
     config.format = OutputFormat::Json;
@@ -93,9 +93,9 @@ void exampleJsonLogging()
     logger.error("Transaction failed");
 }
 
-void exampleFieldConfiguration()
+void sampleFieldConfiguration()
 {
-    std::cout << "\n=== Field Configuration Example ===" << std::endl;
+    std::cout << "\n=== Field Configuration Sample ===" << std::endl;
 
     Logger::Config config;
     config.format = OutputFormat::Terminal;
@@ -123,9 +123,9 @@ void exampleFieldConfiguration()
     logger.info("Window resized");
 }
 
-void exampleFileLogging()
+void sampleFileLogging()
 {
-    std::cout << "\n=== File Logging Example ===" << std::endl;
+    std::cout << "\n=== File Logging Sample ===" << std::endl;
 
     Logger::Config config;
     config.format = OutputFormat::Json;
@@ -144,9 +144,9 @@ void exampleFileLogging()
     std::cout << "Check 'application.log' file for JSON output" << std::endl;
 }
 
-void exampleNetworkLogging()
+void sampleNetworkLogging()
 {
-    std::cout << "\n=== Network Logging Example ===" << std::endl;
+    std::cout << "\n=== Network Logging Sample ===" << std::endl;
 
     // HTTP adapter
     auto httpAdapter = std::make_shared<HttpNetworkAdapter>("http://logstash.example.com:5000");
@@ -181,9 +181,9 @@ void exampleNetworkLogging()
     grpcLogger.info("Streaming data");
 }
 
-void exampleAsyncLogging()
+void sampleAsyncLogging()
 {
-    std::cout << "\n=== Async Logging Example ===" << std::endl;
+    std::cout << "\n=== Async Logging Sample ===" << std::endl;
 
     Logger::Config config;
     config.format = OutputFormat::Terminal;
@@ -218,9 +218,9 @@ void exampleAsyncLogging()
     logger.flush();  // Ensure all async logs are written
 }
 
-void exampleCopyConfig()
+void sampleCopyConfig()
 {
-    std::cout << "\n=== Copy Config Example ===" << std::endl;
+    std::cout << "\n=== Copy Config Sample ===" << std::endl;
 
     Logger::Config config;
     config.format = OutputFormat::Terminal;
@@ -243,9 +243,9 @@ void exampleCopyConfig()
     subLogger.info("Sub service started with inherited config");
 }
 
-void exampleMultipleSinks()
+void sampleMultipleSinks()
 {
-    std::cout << "\n=== Multiple Sinks Example ===" << std::endl;
+    std::cout << "\n=== Multiple Sinks Sample ===" << std::endl;
 
     auto networkAdapter = std::make_shared<HttpNetworkAdapter>("http://logs.example.com");
 
@@ -265,9 +265,9 @@ void exampleMultipleSinks()
     logger.critical("Critical error logged everywhere");
 }
 
-void exampleLogLevels()
+void sampleLogLevels()
 {
-    std::cout << "\n=== Log Levels Example ===" << std::endl;
+    std::cout << "\n=== Log Levels Sample ===" << std::endl;
 
     Logger::Config config;
     config.format = OutputFormat::Terminal;
@@ -304,19 +304,19 @@ void exampleLogLevels()
 
 int main()
 {
-    std::cout << "=== Unified Logger Examples ===" << std::endl;
+    std::cout << "=== Unified Logger Samples ===" << std::endl;
 
-    exampleBasicUsage();
-    exampleJsonLogging();
-    exampleFieldConfiguration();
-    exampleFileLogging();
-    exampleNetworkLogging();
-    exampleAsyncLogging();
-    exampleCopyConfig();
-    exampleMultipleSinks();
-    exampleLogLevels();
+    sampleBasicUsage();
+    sampleJsonLogging();
+    sampleFieldConfiguration();
+    sampleFileLogging();
+    sampleNetworkLogging();
+    sampleAsyncLogging();
+    sampleCopyConfig();
+    sampleMultipleSinks();
+    sampleLogLevels();
 
-    std::cout << "\n=== All Examples Completed ===" << std::endl;
+    std::cout << "\n=== All Samples Completed ===" << std::endl;
 
     return 0;
 }
