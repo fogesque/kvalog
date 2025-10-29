@@ -28,6 +28,7 @@ namespace kvalog
 
 // Log levels matching spdlog
 enum class LogLevel {
+    Off,
     Trace,
     Debug,
     Info,
@@ -406,6 +407,8 @@ private:
     static spdlog::level::level_enum toSpdlogLevel(LogLevel level)
     {
         switch (level) {
+            case LogLevel::Off:
+                return spdlog::level::off;
             case LogLevel::Trace:
                 return spdlog::level::trace;
             case LogLevel::Debug:

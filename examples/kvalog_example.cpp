@@ -294,6 +294,12 @@ void exampleLogLevels()
     logger.info("This won't be shown either");
     logger.warning("This will be shown");
     logger.error("This will be shown too");
+
+    std::cout << "\n--- Setting minimum level to Off ---" << std::endl;
+    logger.setLevel(LogLevel::Off);
+
+    logger.warning("This won't be shown");
+    logger.error("This won't be shown too");
 }
 
 int main()
