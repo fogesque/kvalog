@@ -220,6 +220,7 @@ public:
     void setLevel(LogLevel level)
     {
         if (this->logger) {
+            this->level = level;
             this->logger->set_level(this->toSpdlogLevel(level));
         }
     }
@@ -233,6 +234,7 @@ public:
     }
 
 private:
+    LogLevel level;
     std::shared_ptr<spdlog::logger> logger;
     Config config;
     Context context;
@@ -275,11 +277,16 @@ private:
                 std::make_shared<spdlog::logger>("sync_logger", sinks.begin(), sinks.end());
         }
 
+        this->level = LogLevel::Trace;
         this->logger->set_level(spdlog::level::trace);
     }
 
     void log(LogLevel level, const std::string & message, const std::source_location & location)
     {
+        if (static_cast<int>(this->level) > static_cast<int>(level)) {
+            return;
+        }
+
         if (!this->logger) {
             return;
         }
@@ -292,7 +299,7 @@ private:
             formatted_msg = this->formatTerminal(level, message, location);
         }
 
-        this->logger->log(toSpdlogLevel(level), formatted_msg);
+        this->logger->log(this->toSpdlogLevel(level), formatted_msg);
     }
 
     std::string formatJson(LogLevel level, const std::string & message,
