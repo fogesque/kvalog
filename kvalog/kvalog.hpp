@@ -60,8 +60,8 @@ class NetworkSinkInterface
 {
 public:
     virtual ~NetworkSinkInterface() = default;
-    virtual void sendLog(const std::string & jsonLog) = 0;
-    virtual bool isConnected() const = 0;
+    virtual void SendLog(const std::string & jsonLog) = 0;
+    virtual bool IsConnected() const = 0;
 };
 
 // Custom sink for network logging
@@ -73,7 +73,7 @@ public:
     {
     }
 
-    void setAdapter(std::shared_ptr<NetworkSinkInterface> initialAdapter)
+    void SetAdapter(std::shared_ptr<NetworkSinkInterface> initialAdapter)
     {
         std::lock_guard<std::mutex> lock(mutex_);  // mutex_ is from spdlog::base_sink
         this->adapter = std::move(initialAdapter);
@@ -83,10 +83,10 @@ protected:
     // overrides spdlog::base_sink::sink_it_()
     void sink_it_(const spdlog::details::log_msg & msg) override
     {
-        if (this->adapter && this->adapter->isConnected()) {
+        if (this->adapter && this->adapter->IsConnected()) {
             spdlog::memory_buf_t formatted;
             this->formatter_->format(msg, formatted);  // formatter_ is from spdlog::base_sink
-            this->adapter->sendLog(fmt::to_string(formatted));
+            this->adapter->SendLog(fmt::to_string(formatted));
         }
     }
 
@@ -180,44 +180,44 @@ public:
 
     // Logging methods with automatic source location
 
-    void trace(const std::string & message,
+    void Trace(const std::string & message,
                const std::source_location & location = std::source_location::current())
     {
         this->log(LogLevel::Trace, message, location);
     }
 
-    void debug(const std::string & message,
+    void Debug(const std::string & message,
                const std::source_location & location = std::source_location::current())
     {
         this->log(LogLevel::Debug, message, location);
     }
 
-    void info(const std::string & message,
+    void Info(const std::string & message,
               const std::source_location & location = std::source_location::current())
     {
         this->log(LogLevel::Info, message, location);
     }
 
-    void warning(const std::string & message,
+    void Warning(const std::string & message,
                  const std::source_location & location = std::source_location::current())
     {
         this->log(LogLevel::Warning, message, location);
     }
 
-    void error(const std::string & message,
+    void Error(const std::string & message,
                const std::source_location & location = std::source_location::current())
     {
         this->log(LogLevel::Error, message, location);
     }
 
-    void critical(const std::string & message,
+    void Critical(const std::string & message,
                   const std::source_location & location = std::source_location::current())
     {
         this->log(LogLevel::Critical, message, location);
     }
 
     // Set minimum log level
-    void setLevel(LogLevel level)
+    void SetLevel(LogLevel level)
     {
         if (this->logger) {
             this->level = level;
@@ -226,7 +226,7 @@ public:
     }
 
     // Flush logs
-    void flush()
+    void Flush()
     {
         if (this->logger) {
             this->logger->flush();
@@ -462,5 +462,39 @@ private:
         return oss.str();
     }
 };
+
+inline Logger::Config MakeDefaultLoggerConfig()
+{
+    Logger::Config config;
+    config.format = OutputFormat::Terminal;
+    config.fields = LogFieldConfig{ 
+        .includeAppName = true,
+        .includeProcessId = false,
+        .includeThreadId = false,
+        .includeModuleName = true,
+        .includeLogLevel = true,
+        .includeFile = true,
+        .includeMessage = true,
+        .includeTime = false 
+    };
+    config.asyncMode = Logger::Mode::Sync;
+    config.logToConsole = true;
+    config.logFilePath = std::nullopt;
+    config.networkAdapter = nullptr;
+    config.asyncQueueSize = 8192;
+    config.asyncThreadCount = 1;
+    return config;
+}
+
+inline Logger CreateLogger(const std::string& appName, const std::string& moduleName)
+{
+    auto defaultConfig = MakeDefaultLoggerConfig();
+    
+    Logger::Context context;
+    context.appName = appName;
+    context.moduleName = moduleName;
+    
+    return Logger(defaultConfig, context);
+}
 
 }  // namespace kvalog
