@@ -14,13 +14,13 @@ public:
     {
     }
 
-    void sendLog(const std::string & jsonLog) override
+    void SendLog(const std::string & jsonLog) override
     {
         // In real implementation: HTTP POST to endpoint
         std::cout << "[HTTP -> " << this->endpoint << "] " << jsonLog << std::endl;
     }
 
-    bool isConnected() const override
+    bool IsConnected() const override
     {
         return this->connected;
     }
@@ -39,13 +39,13 @@ public:
     {
     }
 
-    void sendLog(const std::string & jsonLog) override
+    void SendLog(const std::string & jsonLog) override
     {
         // In real implementation: gRPC call
         std::cout << "[gRPC -> " << this->serverAddress << "] " << jsonLog << std::endl;
     }
 
-    bool isConnected() const override
+    bool IsConnected() const override
     {
         return this->connected;
     }
@@ -69,10 +69,10 @@ void sampleBasicUsage()
 
     Logger logger(config, ctx);
 
-    logger.info("Application started successfully");
-    logger.debug("Connected to database");
-    logger.warning("Cache miss for key: user_123");
-    logger.error("Failed to connect to remote service");
+    logger.Info("Application started successfully");
+    logger.Debug("Connected to database");
+    logger.Warning("Cache miss for key: user_123");
+    logger.Error("Failed to connect to remote service");
 }
 
 void sampleJsonLogging()
@@ -89,8 +89,8 @@ void sampleJsonLogging()
 
     Logger logger(config, ctx);
 
-    logger.info("User logged in");
-    logger.error("Transaction failed");
+    logger.Info("User logged in");
+    logger.Error("Transaction failed");
 }
 
 void sampleFieldConfiguration()
@@ -112,7 +112,7 @@ void sampleFieldConfiguration()
 
     Logger logger(config, ctx);
 
-    logger.info("Button clicked");
+    logger.Info("Button clicked");
 
     // Re-enable fields at runtime
     LogFieldConfig newFields;
@@ -120,7 +120,7 @@ void sampleFieldConfiguration()
     newFields.includeThreadId = true;
     logger.SetFieldConfig(newFields);
 
-    logger.info("Window resized");
+    logger.Info("Window resized");
 }
 
 void sampleFileLogging()
@@ -138,8 +138,8 @@ void sampleFileLogging()
 
     Logger logger(config, ctx);
 
-    logger.info("Logging to both console and file");
-    logger.debug("Configuration loaded");
+    logger.Info("Logging to both console and file");
+    logger.Debug("Configuration loaded");
 
     std::cout << "Check 'application.log' file for JSON output" << std::endl;
 }
@@ -162,8 +162,8 @@ void sampleNetworkLogging()
 
     Logger logger(config, ctx);
 
-    logger.info("Request received");
-    logger.error("Invalid input data");
+    logger.Info("Request received");
+    logger.Error("Invalid input data");
 
     // Switch to gRPC adapter
     std::cout << "\n--- Switching to gRPC ---" << std::endl;
@@ -178,7 +178,7 @@ void sampleNetworkLogging()
     grpcCtx.moduleName = "MainModule";
 
     Logger grpcLogger(grpcConfig, grpcCtx);
-    grpcLogger.info("Streaming data");
+    grpcLogger.Info("Streaming data");
 }
 
 void sampleAsyncLogging()
@@ -201,7 +201,7 @@ void sampleAsyncLogging()
     // Log from multiple threads
     auto worker = [&logger](int workerId) {
         for (int i = 0; i < 5; ++i) {
-            logger.info("Worker" + std::to_string(workerId) + " is processing item" +
+            logger.Info("Worker" + std::to_string(workerId) + " is processing item" +
                         std::to_string(i));
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
@@ -215,7 +215,7 @@ void sampleAsyncLogging()
     t2.join();
     t3.join();
 
-    logger.flush();  // Ensure all async logs are written
+    logger.Flush();  // Ensure all async logs are written
 }
 
 void sampleCopyConfig()
@@ -232,7 +232,7 @@ void sampleCopyConfig()
     ctx.moduleName = "MainModule";
 
     Logger mainLogger(config, ctx);
-    mainLogger.info("Main service started");
+    mainLogger.Info("Main service started");
 
     Logger::Context newCtx;
     newCtx.appName = "SubService";
@@ -240,7 +240,7 @@ void sampleCopyConfig()
 
     // Create new logger with same config but different app name
     Logger subLogger = Logger::WithConfigFrom(mainLogger, newCtx);
-    subLogger.info("Sub service started with inherited config");
+    subLogger.Info("Sub service started with inherited config");
 }
 
 void sampleMultipleSinks()
@@ -261,8 +261,8 @@ void sampleMultipleSinks()
 
     Logger logger(config, ctx);
 
-    logger.info("This goes to console, file, and network!");
-    logger.critical("Critical error logged everywhere");
+    logger.Info("This goes to console, file, and network!");
+    logger.Critical("Critical Error logged everywhere");
 }
 
 void sampleLogLevels()
@@ -280,26 +280,38 @@ void sampleLogLevels()
     Logger logger(config);
 
     // Log at all levels
-    logger.trace("Trace level message");
-    logger.debug("Debug level message");
-    logger.info("Info level message");
-    logger.warning("Warning level message");
-    logger.error("Error level message");
-    logger.critical("Critical level message");
+    logger.Trace("Trace level message");
+    logger.Debug("Debug level message");
+    logger.Info("Info level message");
+    logger.Warning("Warning level message");
+    logger.Error("Error level message");
+    logger.Critical("Critical level message");
 
     std::cout << "\n--- Setting minimum level to Warning ---" << std::endl;
-    logger.setLevel(LogLevel::Warning);
+    logger.SetLevel(LogLevel::Warning);
 
-    logger.debug("This won't be shown");
-    logger.info("This won't be shown either");
-    logger.warning("This will be shown");
-    logger.error("This will be shown too");
+    logger.Debug("This won't be shown");
+    logger.Info("This won't be shown either");
+    logger.Warning("This will be shown");
+    logger.Error("This will be shown too");
 
     std::cout << "\n--- Setting minimum level to Off ---" << std::endl;
-    logger.setLevel(LogLevel::Off);
+    logger.SetLevel(LogLevel::Off);
 
-    logger.warning("This won't be shown");
-    logger.error("This won't be shown too");
+    logger.Warning("This won't be shown");
+    logger.Error("This won't be shown too");
+}
+
+void sampleFabricMethods() {
+    std::cout << "\n=== Fabric Methods Sample ===" << std::endl;
+
+    auto logger = kvalog::CreateLogger("MyApp", "Main");
+        
+    logger.Info("Application started successfully");
+    logger.Debug("Connected to database");
+    logger.Warning("Cache miss for key: user_123");
+    logger.Error("Failed to connect to remote service");
+
 }
 
 int main()
@@ -314,7 +326,8 @@ int main()
     sampleAsyncLogging();
     sampleCopyConfig();
     sampleMultipleSinks();
-    sampleLogLevels();
+    sampleLogLevels(); 
+    sampleFabricMethods();
 
     std::cout << "\n=== All Samples Completed ===" << std::endl;
 
