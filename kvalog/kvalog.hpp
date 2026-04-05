@@ -161,8 +161,8 @@ namespace AnsiColor
 {
 /// @brief Resets all terminal formatting
 inline constexpr auto Reset = "\033[0m";
-/// @brief Warm tint for the entire log line (light yellow foreground)
-inline constexpr auto WarmTint = "\033[38;5;223m";
+/// @brief Warm tint for the entire log line (bright white foreground)
+inline constexpr auto WarmTint = "\033[97m";
 /// @brief Trace level color (light velvet / light magenta)
 inline constexpr auto Trace = "\033[38;5;183m";
 /// @brief Debug level color (light cyan)
