@@ -19,6 +19,7 @@
 #define NOMINMAX
 #include <windows.h>
 #else
+#include <sys/syscall.h>
 #include <unistd.h>
 #endif
 
@@ -618,12 +619,14 @@ private:
 #endif
     }
 
-    /// @brief Returns the current thread ID as a string
+    /// @brief Returns the current kernel thread ID as a string
     static std::string getThreadId()
     {
-        auto output = std::ostringstream();
-        output << std::this_thread::get_id();
-        return output.str();
+#ifdef _WIN32
+        return std::to_string(static_cast<int>(GetCurrentThreadId()));
+#else
+        return std::to_string(static_cast<int>(syscall(SYS_gettid)));
+#endif
     }
 
     /// @brief Returns the current timestamp as a formatted string
