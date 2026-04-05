@@ -369,10 +369,15 @@ void sampleProfiles()
     defaultLogger->Info("Balanced everyday output");
     defaultLogger->Error("Connection lost to {}", "db-replica-2");
 
+    std::cout << "\n--- Detailed ---" << std::endl;
+    auto detailed = kvalog::CreateLogger(LogProfile::Detailed, context);
+    detailed->Info("Timestamps without process and thread IDs");
+    detailed->Debug("Request handled in {:.2f}ms", 3.14);
+
     std::cout << "\n--- Verbose ---" << std::endl;
     auto verbose = kvalog::CreateLogger(LogProfile::Verbose, context);
     verbose->Info("Full diagnostics with timestamps and IDs");
-    verbose->Debug("Request handled in {:.2f}ms", 3.14);
+    verbose->Warning("Memory usage at {}MB", 512);
 
     std::cout << "\n--- ColoredDefault ---" << std::endl;
     auto coloredDefault = kvalog::CreateLogger(LogProfile::ColoredDefault, context);
@@ -382,6 +387,11 @@ void sampleProfiles()
     coloredDefault->Warning("Watch out");
     coloredDefault->Error("Something broke");
     coloredDefault->Critical("System is down");
+
+    std::cout << "\n--- ColoredDetailed ---" << std::endl;
+    auto coloredDetailed = kvalog::CreateLogger(LogProfile::ColoredDetailed, context);
+    coloredDetailed->Info("Colored timestamps without process and thread IDs");
+    coloredDetailed->Warning("Retry attempt {}/{}", 2, 3);
 
     std::cout << "\n--- ColoredVerbose ---" << std::endl;
     auto coloredVerbose = kvalog::CreateLogger(LogProfile::ColoredVerbose, context);

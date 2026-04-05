@@ -665,8 +665,10 @@ private:
 enum class LogProfile {
     Minimal,
     Default,
+    Detailed,
     Verbose,
     ColoredDefault,
+    ColoredDetailed,
     ColoredVerbose,
     Json
 };
@@ -701,6 +703,18 @@ inline Logger::Config MakeProfileConfig(LogProfile profile)
                                             .includeTime = false };
             break;
 
+        case LogProfile::Detailed:
+            config.format = OutputFormat::Terminal;
+            config.fields = LogFieldConfig{ .includeAppName = true,
+                                            .includeProcessId = false,
+                                            .includeThreadId = false,
+                                            .includeModuleName = true,
+                                            .includeLogLevel = true,
+                                            .includeFile = true,
+                                            .includeMessage = true,
+                                            .includeTime = true };
+            break;
+
         case LogProfile::Verbose:
             config.format = OutputFormat::Terminal;
             config.fields = LogFieldConfig{ .includeAppName = true,
@@ -724,6 +738,19 @@ inline Logger::Config MakeProfileConfig(LogProfile profile)
                                             .includeFile = true,
                                             .includeMessage = true,
                                             .includeTime = false };
+            break;
+
+        case LogProfile::ColoredDetailed:
+            config.format = OutputFormat::Terminal;
+            config.enableColors = true;
+            config.fields = LogFieldConfig{ .includeAppName = true,
+                                            .includeProcessId = false,
+                                            .includeThreadId = false,
+                                            .includeModuleName = true,
+                                            .includeLogLevel = true,
+                                            .includeFile = true,
+                                            .includeMessage = true,
+                                            .includeTime = true };
             break;
 
         case LogProfile::ColoredVerbose:
