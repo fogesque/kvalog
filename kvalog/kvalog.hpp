@@ -33,6 +33,26 @@ class Logger;
 // Type aliases
 using LoggerPtr = std::shared_ptr<Logger>;
 
+/// @brief Wrapper that captures source_location at the call site via implicit conversion
+struct FormatString {
+    std::string_view value;
+    std::source_location location;
+
+    /// @brief Implicit conversion from string literal captures location at call site
+    FormatString(const char * str,
+                 const std::source_location & loc = std::source_location::current())
+        : value(str), location(loc)
+    {
+    }
+
+    /// @brief Implicit conversion from std::string captures location at call site
+    FormatString(const std::string & str,
+                 const std::source_location & loc = std::source_location::current())
+        : value(str), location(loc)
+    {
+    }
+};
+
 /// @brief Log levels matching spdlog
 enum class LogLevel {
     Off,
@@ -234,46 +254,46 @@ public:
 
     /// [Logging]
 
-    /// @brief Logs a message at Trace level
-    void Trace(const std::string & message,
-               const std::source_location & location = std::source_location::current())
+    /// @brief Logs a message at Trace level with optional format arguments
+    template <typename... Args>
+    void Trace(FormatString format, Args &&... args)
     {
-        this->log(LogLevel::Trace, message, location);
+        this->log(LogLevel::Trace, format, std::forward<Args>(args)...);
     }
 
-    /// @brief Logs a message at Debug level
-    void Debug(const std::string & message,
-               const std::source_location & location = std::source_location::current())
+    /// @brief Logs a message at Debug level with optional format arguments
+    template <typename... Args>
+    void Debug(FormatString format, Args &&... args)
     {
-        this->log(LogLevel::Debug, message, location);
+        this->log(LogLevel::Debug, format, std::forward<Args>(args)...);
     }
 
-    /// @brief Logs a message at Info level
-    void Info(const std::string & message,
-              const std::source_location & location = std::source_location::current())
+    /// @brief Logs a message at Info level with optional format arguments
+    template <typename... Args>
+    void Info(FormatString format, Args &&... args)
     {
-        this->log(LogLevel::Info, message, location);
+        this->log(LogLevel::Info, format, std::forward<Args>(args)...);
     }
 
-    /// @brief Logs a message at Warning level
-    void Warning(const std::string & message,
-                 const std::source_location & location = std::source_location::current())
+    /// @brief Logs a message at Warning level with optional format arguments
+    template <typename... Args>
+    void Warning(FormatString format, Args &&... args)
     {
-        this->log(LogLevel::Warning, message, location);
+        this->log(LogLevel::Warning, format, std::forward<Args>(args)...);
     }
 
-    /// @brief Logs a message at Error level
-    void Error(const std::string & message,
-               const std::source_location & location = std::source_location::current())
+    /// @brief Logs a message at Error level with optional format arguments
+    template <typename... Args>
+    void Error(FormatString format, Args &&... args)
     {
-        this->log(LogLevel::Error, message, location);
+        this->log(LogLevel::Error, format, std::forward<Args>(args)...);
     }
 
-    /// @brief Logs a message at Critical level
-    void Critical(const std::string & message,
-                  const std::source_location & location = std::source_location::current())
+    /// @brief Logs a message at Critical level with optional format arguments
+    template <typename... Args>
+    void Critical(FormatString format, Args &&... args)
     {
-        this->log(LogLevel::Critical, message, location);
+        this->log(LogLevel::Critical, format, std::forward<Args>(args)...);
     }
 
     /// [Level Management]
@@ -376,7 +396,8 @@ private:
     /// [Logging Implementation]
 
     /// @brief Formats and dispatches a log message at the given level
-    void log(LogLevel level, const std::string & message, const std::source_location & location)
+    template <typename... Args>
+    void log(LogLevel level, FormatString format, Args &&... args)
     {
         if (static_cast<int>(this->level) > static_cast<int>(level)) {
             return;
@@ -386,15 +407,22 @@ private:
             return;
         }
 
-        auto formattedMessage = std::string();
-
-        if (this->config.format == OutputFormat::Json) {
-            formattedMessage = this->formatJson(level, message, location);
+        auto message = std::string();
+        if constexpr (sizeof...(Args) > 0) {
+            message = fmt::format(fmt::runtime(format.value), std::forward<Args>(args)...);
         } else {
-            formattedMessage = this->formatTerminal(level, message, location);
+            message = std::string(format.value);
         }
 
-        this->logger->log(Logger::toSpdlogLevel(level), formattedMessage);
+        auto formattedOutput = std::string();
+
+        if (this->config.format == OutputFormat::Json) {
+            formattedOutput = this->formatJson(level, message, format.location);
+        } else {
+            formattedOutput = this->formatTerminal(level, message, format.location);
+        }
+
+        this->logger->log(Logger::toSpdlogLevel(level), formattedOutput);
     }
 
     /// [Formatting]

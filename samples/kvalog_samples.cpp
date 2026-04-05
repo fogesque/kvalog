@@ -312,6 +312,34 @@ void sampleColoredOutput()
     logger->Critical("Critical level message");
 }
 
+void sampleFormattedLogging()
+{
+    std::cout << "\n=== Formatted Logging Sample ===" << std::endl;
+
+    auto config = Logger::Config();
+    config.format = OutputFormat::Terminal;
+    config.logToConsole = true;
+    config.enableColors = true;
+
+    auto context = Logger::Context();
+    context.appName = "FormatApp";
+    context.moduleName = "MainModule";
+
+    auto logger = Logger::Create(config, context);
+
+    // Plain string (no formatting)
+    logger->Info("Application started successfully");
+
+    // Formatted with arguments
+    const auto username = std::string("alice");
+    const auto ip = std::string("192.168.1.42");
+    logger->Info("User '{}' logged in from {}", username, ip);
+
+    logger->Warning("Cache miss rate: {:.1f}%", 12.5);
+    logger->Error("Connection to {} failed after {} retries", "db-primary", 3);
+    logger->Debug("Processing batch {}/{}", 7, 10);
+}
+
 void sampleFabricMethods()
 {
     std::cout << "\n=== Fabric Methods Sample ===" << std::endl;
@@ -320,7 +348,7 @@ void sampleFabricMethods()
 
     logger->Info("Application started successfully");
     logger->Debug("Connected to database");
-    logger->Warning("Cache miss for key: user_123");
+    logger->Warning("Cache miss for key: {}", "user_123");
     logger->Error("Failed to connect to remote service");
 }
 
@@ -338,6 +366,7 @@ int main()
     sampleMultipleSinks();
     sampleLogLevels();
     sampleColoredOutput();
+    sampleFormattedLogging();
     sampleFabricMethods();
 
     std::cout << "\n=== All Samples Completed ===" << std::endl;
