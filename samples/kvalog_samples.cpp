@@ -344,12 +344,54 @@ void sampleFabricMethods()
 {
     std::cout << "\n=== Fabric Methods Sample ===" << std::endl;
 
-    auto logger = kvalog::CreateLogger("MyApp", "Main");
+    const auto context = Logger::Context{ .appName = "MyApp", .moduleName = "Main" };
+    auto logger = kvalog::CreateLogger(LogProfile::ColoredDefault, context);
 
     logger->Info("Application started successfully");
     logger->Debug("Connected to database");
     logger->Warning("Cache miss for key: {}", "user_123");
     logger->Error("Failed to connect to remote service");
+}
+
+void sampleProfiles()
+{
+    std::cout << "\n=== Profiles Sample ===" << std::endl;
+
+    const auto context = Logger::Context{ .appName = "ProfileApp", .moduleName = "Demo" };
+
+    std::cout << "\n--- Minimal ---" << std::endl;
+    auto minimal = kvalog::CreateLogger(LogProfile::Minimal, context);
+    minimal->Info("Least noise, just the essentials");
+    minimal->Warning("Something needs attention");
+
+    std::cout << "\n--- Default ---" << std::endl;
+    auto defaultLogger = kvalog::CreateLogger(LogProfile::Default, context);
+    defaultLogger->Info("Balanced everyday output");
+    defaultLogger->Error("Connection lost to {}", "db-replica-2");
+
+    std::cout << "\n--- Verbose ---" << std::endl;
+    auto verbose = kvalog::CreateLogger(LogProfile::Verbose, context);
+    verbose->Info("Full diagnostics with timestamps and IDs");
+    verbose->Debug("Request handled in {:.2f}ms", 3.14);
+
+    std::cout << "\n--- ColoredDefault ---" << std::endl;
+    auto coloredDefault = kvalog::CreateLogger(LogProfile::ColoredDefault, context);
+    coloredDefault->Trace("Trace level detail");
+    coloredDefault->Debug("Debugging info");
+    coloredDefault->Info("Normal operation");
+    coloredDefault->Warning("Watch out");
+    coloredDefault->Error("Something broke");
+    coloredDefault->Critical("System is down");
+
+    std::cout << "\n--- ColoredVerbose ---" << std::endl;
+    auto coloredVerbose = kvalog::CreateLogger(LogProfile::ColoredVerbose, context);
+    coloredVerbose->Info("Full color with all fields");
+    coloredVerbose->Error("Disk usage at {}%", 95);
+
+    std::cout << "\n--- Json ---" << std::endl;
+    auto json = kvalog::CreateLogger(LogProfile::Json, context);
+    json->Info("Structured output for log aggregation");
+    json->Warning("Latency spike: {}ms", 250);
 }
 
 int main()
@@ -368,6 +410,7 @@ int main()
     sampleColoredOutput();
     sampleFormattedLogging();
     sampleFabricMethods();
+    sampleProfiles();
 
     std::cout << "\n=== All Samples Completed ===" << std::endl;
 

@@ -658,38 +658,105 @@ private:
     int processId = 0;
 };
 
-/// @brief Creates a default logger configuration for terminal output
-inline Logger::Config MakeDefaultLoggerConfig()
+/// @brief Predefined logging profiles for common use cases
+enum class LogProfile {
+    Minimal,
+    Default,
+    Verbose,
+    ColoredDefault,
+    ColoredVerbose,
+    Json
+};
+
+/// @brief Creates a logger configuration for the given profile
+inline Logger::Config MakeProfileConfig(LogProfile profile)
 {
     auto config = Logger::Config();
-    config.format = OutputFormat::Terminal;
-    config.fields = LogFieldConfig{ .includeAppName = true,
-                                    .includeProcessId = false,
-                                    .includeThreadId = false,
-                                    .includeModuleName = true,
-                                    .includeLogLevel = true,
-                                    .includeFile = true,
-                                    .includeMessage = true,
-                                    .includeTime = false };
-    config.asyncMode = Logger::Mode::Sync;
-    config.logToConsole = true;
-    config.logFilePath = std::nullopt;
-    config.networkAdapter = nullptr;
-    config.asyncQueueSize = DefaultAsyncQueueSize;
-    config.asyncThreadCount = DefaultAsyncThreadCount;
+
+    switch (profile) {
+        case LogProfile::Minimal:
+            config.format = OutputFormat::Terminal;
+            config.fields = LogFieldConfig{ .includeAppName = true,
+                                            .includeProcessId = false,
+                                            .includeThreadId = false,
+                                            .includeModuleName = false,
+                                            .includeLogLevel = true,
+                                            .includeFile = false,
+                                            .includeMessage = true,
+                                            .includeTime = false };
+            break;
+
+        case LogProfile::Default:
+            config.format = OutputFormat::Terminal;
+            config.fields = LogFieldConfig{ .includeAppName = true,
+                                            .includeProcessId = false,
+                                            .includeThreadId = false,
+                                            .includeModuleName = true,
+                                            .includeLogLevel = true,
+                                            .includeFile = true,
+                                            .includeMessage = true,
+                                            .includeTime = false };
+            break;
+
+        case LogProfile::Verbose:
+            config.format = OutputFormat::Terminal;
+            config.fields = LogFieldConfig{ .includeAppName = true,
+                                            .includeProcessId = true,
+                                            .includeThreadId = true,
+                                            .includeModuleName = true,
+                                            .includeLogLevel = true,
+                                            .includeFile = true,
+                                            .includeMessage = true,
+                                            .includeTime = true };
+            break;
+
+        case LogProfile::ColoredDefault:
+            config.format = OutputFormat::Terminal;
+            config.enableColors = true;
+            config.fields = LogFieldConfig{ .includeAppName = true,
+                                            .includeProcessId = false,
+                                            .includeThreadId = false,
+                                            .includeModuleName = true,
+                                            .includeLogLevel = true,
+                                            .includeFile = true,
+                                            .includeMessage = true,
+                                            .includeTime = false };
+            break;
+
+        case LogProfile::ColoredVerbose:
+            config.format = OutputFormat::Terminal;
+            config.enableColors = true;
+            config.fields = LogFieldConfig{ .includeAppName = true,
+                                            .includeProcessId = true,
+                                            .includeThreadId = true,
+                                            .includeModuleName = true,
+                                            .includeLogLevel = true,
+                                            .includeFile = true,
+                                            .includeMessage = true,
+                                            .includeTime = true };
+            break;
+
+        case LogProfile::Json:
+            config.format = OutputFormat::Json;
+            config.fields = LogFieldConfig{ .includeAppName = true,
+                                            .includeProcessId = true,
+                                            .includeThreadId = true,
+                                            .includeModuleName = true,
+                                            .includeLogLevel = true,
+                                            .includeFile = true,
+                                            .includeMessage = true,
+                                            .includeTime = true };
+            break;
+    }
+
     return config;
 }
 
-/// @brief Creates a Logger with default terminal configuration and given app/module names
-inline LoggerPtr CreateLogger(const std::string & appName, const std::string & moduleName)
+/// @brief Creates a Logger with the given profile and context
+inline LoggerPtr CreateLogger(LogProfile profile, const Logger::Context & context)
 {
-    const auto defaultConfig = MakeDefaultLoggerConfig();
-
-    auto context = Logger::Context();
-    context.appName = appName;
-    context.moduleName = moduleName;
-
-    return Logger::Create(defaultConfig, context);
+    const auto config = MakeProfileConfig(profile);
+    return Logger::Create(config, context);
 }
 
 }  // namespace kvalog
