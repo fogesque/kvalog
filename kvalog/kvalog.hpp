@@ -15,7 +15,6 @@
 #include <string>
 #include <thread>
 
-// Add system headers for process ID
 #ifdef _WIN32
 #define NOMINMAX
 #include <windows.h>
@@ -26,7 +25,15 @@
 namespace kvalog
 {
 
-// Log levels matching spdlog
+// Forward declarations
+class INetworkSink;
+class NetworkSink;
+class Logger;
+
+// Type aliases
+using LoggerPtr = std::shared_ptr<Logger>;
+
+/// @brief Log levels matching spdlog
 enum class LogLevel {
     Off,
     Trace,
@@ -37,7 +44,7 @@ enum class LogLevel {
     Critical
 };
 
-// Configuration for which fields to include in logs
+/// @brief Configuration for which fields to include in logs
 struct LogFieldConfig {
     bool includeAppName = true;
     bool includeProcessId = true;
@@ -49,183 +56,238 @@ struct LogFieldConfig {
     bool includeTime = true;
 };
 
-// Output format type
+/// @brief Output format type
 enum class OutputFormat {
     Json,
     Terminal
 };
 
-// Interface for network sink adapters
-class NetworkSinkInterface
+///
+/// @brief
+/// INetworkSink defines the interface for network sink adapters
+///
+class INetworkSink
 {
 public:
-    virtual ~NetworkSinkInterface() = default;
+    /// @brief Destructor
+    virtual ~INetworkSink() = default;
+
+    /// @brief Sends a formatted log entry over the network
     virtual void SendLog(const std::string & jsonLog) = 0;
+    /// @brief Returns whether the network connection is active
     virtual bool IsConnected() const = 0;
 };
 
-// Custom sink for network logging
+///
+/// @brief
+/// NetworkSink is a custom spdlog sink that forwards log messages to a network adapter
+///
 class NetworkSink : public spdlog::sinks::base_sink<std::mutex>
 {
 public:
-    explicit NetworkSink(std::shared_ptr<NetworkSinkInterface> initialAdapter)
+    /// [Construction & Destruction]
+
+#pragma region NetworkSink::Construct
+
+    /// @brief Constructor with network adapter
+    explicit NetworkSink(std::shared_ptr<INetworkSink> initialAdapter)
         : adapter(std::move(initialAdapter))
     {
     }
 
-    void SetAdapter(std::shared_ptr<NetworkSinkInterface> initialAdapter)
+#pragma endregion
+
+    /// [Adapter Management]
+
+    /// @brief Replaces the current network adapter with a new one
+    void SetAdapter(std::shared_ptr<INetworkSink> newAdapter)
     {
-        std::lock_guard<std::mutex> lock(mutex_);  // mutex_ is from spdlog::base_sink
-        this->adapter = std::move(initialAdapter);
+        std::lock_guard<std::mutex> lock(mutex_);
+        this->adapter = std::move(newAdapter);
     }
 
 protected:
-    // overrides spdlog::base_sink::sink_it_()
-    void sink_it_(const spdlog::details::log_msg & msg) override
+    /// @brief Formats and sends a log message through the network adapter
+    void sink_it_(const spdlog::details::log_msg & message) override
     {
         if (this->adapter && this->adapter->IsConnected()) {
             spdlog::memory_buf_t formatted;
-            this->formatter_->format(msg, formatted);  // formatter_ is from spdlog::base_sink
+            this->formatter_->format(message, formatted);
             this->adapter->SendLog(fmt::to_string(formatted));
         }
     }
 
-    // overrides spdlog::base_sink::flush_()
-    void flush_() override
-    {
-        // Network sinks typically don't need explicit flushing
-    }
+    /// @brief Flushes the sink (no-op for network sinks)
+    void flush_() override {}
 
 private:
-    std::shared_ptr<NetworkSinkInterface> adapter;
+    /// [Properties]
+
+    /// @brief Network adapter for sending log messages
+    std::shared_ptr<INetworkSink> adapter = nullptr;
 };
 
-// Main Logger class
+/// @brief Default async queue size
+inline constexpr std::size_t DefaultAsyncQueueSize = 8192;
+/// @brief Default async thread count
+inline constexpr std::size_t DefaultAsyncThreadCount = 1;
+/// @brief Milliseconds divisor for time formatting
+inline constexpr int MillisecondsDivisor = 1000;
+/// @brief Millisecond field width for time formatting
+inline constexpr int MillisecondsFieldWidth = 3;
+
+/// @brief ANSI escape codes for terminal log coloring
+namespace AnsiColor
+{
+/// @brief Resets all terminal formatting
+inline constexpr auto Reset = "\033[0m";
+/// @brief Warm tint for the entire log line (light yellow foreground)
+inline constexpr auto WarmTint = "\033[38;5;223m";
+/// @brief Trace level color (light velvet / light magenta)
+inline constexpr auto Trace = "\033[38;5;183m";
+/// @brief Debug level color (light cyan)
+inline constexpr auto Debug = "\033[96m";
+/// @brief Info level color (light blue)
+inline constexpr auto Info = "\033[94m";
+/// @brief Warning level color (yellow)
+inline constexpr auto Warning = "\033[33m";
+/// @brief Error level color (red)
+inline constexpr auto Error = "\033[31m";
+/// @brief Critical level color (bold red)
+inline constexpr auto Critical = "\033[1;31m";
+}  // namespace AnsiColor
+
+///
+/// @brief
+/// Logger provides structured logging with configurable output formats, sinks, and fields
+///
 class Logger
 {
 public:
-    // Logging mode
+    /// @brief Logging mode
     enum class Mode {
         Sync,
         Async
     };
 
-    // Logger configuration
+    /// @brief Logger configuration
     struct Config {
         OutputFormat format = OutputFormat::Terminal;
         LogFieldConfig fields = LogFieldConfig();
         Mode asyncMode = Mode::Sync;
 
-        // Output destinations
         bool logToConsole = true;
+        bool enableColors = false;
         std::optional<std::string> logFilePath = std::nullopt;
-        std::shared_ptr<NetworkSinkInterface> networkAdapter = nullptr;
+        std::shared_ptr<INetworkSink> networkAdapter = nullptr;
 
-        // Async settings (only used if async_mode = true)
-        size_t asyncQueueSize = 8192;
-        size_t asyncThreadCount = 1;
+        std::size_t asyncQueueSize = DefaultAsyncQueueSize;
+        std::size_t asyncThreadCount = DefaultAsyncThreadCount;
     };
 
-    // Context information for logs
+    /// @brief Context information for logs
     struct Context {
-        std::string appName = "";
-        std::string moduleName = "";
+        std::string appName;
+        std::string moduleName;
     };
 
-    // Constructor with configuration
-    explicit Logger(const Config & initialConfig)
-        : config(initialConfig), context(Context()), processId(Logger::getProcessId())
+    /// [Fabric Methods]
+
+    /// @brief Creates a Logger instance with given configuration
+    static LoggerPtr Create(const Config & config)
     {
-        this->initializeLogger();
+        return std::make_shared<Logger>(config);
     }
 
-    // Constructor with configuration and context
-    explicit Logger(const Config & initialConfig, const Context & initialContext)
-        : config(initialConfig), context(initialContext), processId(Logger::getProcessId())
+    /// @brief Creates a Logger instance with given configuration and context
+    static LoggerPtr Create(const Config & config, const Context & context)
     {
-        this->initializeLogger();
+        return std::make_shared<Logger>(config, context);
     }
 
-    // Copy constructor to create logger with copied config and context
-    Logger(const Logger & other)
-        : config(other.config), context(other.context), processId(Logger::getProcessId())
-    {
-        this->initializeLogger();
-    }
-
-    // Create new logger with config from existing one
+    /// @brief Creates a new Logger with configuration copied from an existing one
     static Logger WithConfigFrom(const Logger & source, const Context & newContext)
     {
-        Config newConfig = source.config;
+        const auto newConfig = source.config;
         return Logger(newConfig, newContext);
     }
 
-    // Update field configuration at runtime
+    /// [Field Configuration]
+
+    /// @brief Updates field configuration at runtime
     void SetFieldConfig(const LogFieldConfig & fields)
     {
         this->config.fields = fields;
     }
 
-    // Get current field configuration
+    /// @brief Returns current field configuration
     LogFieldConfig GetFieldConfig() const
     {
         return this->config.fields;
     }
 
-    // Update output format at runtime
+    /// @brief Updates output format at runtime
     void SetOutputFormat(OutputFormat format)
     {
         this->config.format = format;
     }
 
-    // Logging methods with automatic source location
+    /// [Logging]
 
+    /// @brief Logs a message at Trace level
     void Trace(const std::string & message,
                const std::source_location & location = std::source_location::current())
     {
         this->log(LogLevel::Trace, message, location);
     }
 
+    /// @brief Logs a message at Debug level
     void Debug(const std::string & message,
                const std::source_location & location = std::source_location::current())
     {
         this->log(LogLevel::Debug, message, location);
     }
 
+    /// @brief Logs a message at Info level
     void Info(const std::string & message,
               const std::source_location & location = std::source_location::current())
     {
         this->log(LogLevel::Info, message, location);
     }
 
+    /// @brief Logs a message at Warning level
     void Warning(const std::string & message,
                  const std::source_location & location = std::source_location::current())
     {
         this->log(LogLevel::Warning, message, location);
     }
 
+    /// @brief Logs a message at Error level
     void Error(const std::string & message,
                const std::source_location & location = std::source_location::current())
     {
         this->log(LogLevel::Error, message, location);
     }
 
+    /// @brief Logs a message at Critical level
     void Critical(const std::string & message,
                   const std::source_location & location = std::source_location::current())
     {
         this->log(LogLevel::Critical, message, location);
     }
 
-    // Set minimum log level
+    /// [Level Management]
+
+    /// @brief Sets minimum log level
     void SetLevel(LogLevel level)
     {
         if (this->logger) {
             this->level = level;
-            this->logger->set_level(this->toSpdlogLevel(level));
+            this->logger->set_level(Logger::toSpdlogLevel(level));
         }
     }
 
-    // Flush logs
+    /// @brief Flushes all pending log messages
     void Flush()
     {
         if (this->logger) {
@@ -233,25 +295,57 @@ public:
         }
     }
 
-private:
-    LogLevel level;
-    std::shared_ptr<spdlog::logger> logger;
-    Config config;
-    Context context;
-    int processId;
+    /// [Construction & Destruction]
 
+#pragma region Logger::Construct
+
+    /// @brief Copy constructor is deleted
+    Logger(const Logger &) = delete;
+    /// @brief Copy operator is deleted
+    Logger & operator=(const Logger &) = delete;
+
+    /// @brief Move constructor
+    Logger(Logger &&) = default;
+    /// @brief Move assignment operator
+    Logger & operator=(Logger &&) = default;
+
+    /// @brief Constructor with configuration
+    /// @warning Avoid using this constructor since class has static fabric methods
+    explicit Logger(const Config & initialConfig)
+        : config(initialConfig), processId(Logger::getProcessId())
+    {
+        this->initializeLogger();
+    }
+
+    /// @brief Constructor with configuration and context
+    /// @warning Avoid using this constructor since class has static fabric methods
+    explicit Logger(const Config & initialConfig, const Context & initialContext)
+        : config(initialConfig), context(initialContext), processId(Logger::getProcessId())
+    {
+        this->initializeLogger();
+    }
+
+    /// @brief Destructor
+    ~Logger() = default;
+
+#pragma endregion
+
+private:
+#pragma region Logger::PrivateMethods
+
+    /// [Initialization]
+
+    /// @brief Initializes the spdlog logger with configured sinks
     void initializeLogger()
     {
-        std::vector<spdlog::sink_ptr> sinks;
+        auto sinks = std::vector<spdlog::sink_ptr>();
 
-        // Console sink
         if (this->config.logToConsole) {
             auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-            consoleSink->set_pattern("%v");  // We'll format ourselves
+            consoleSink->set_pattern("%v");
             sinks.push_back(consoleSink);
         }
 
-        // File sink
         if (this->config.logFilePath) {
             auto fileSink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
                 *this->config.logFilePath, true);
@@ -259,16 +353,14 @@ private:
             sinks.push_back(fileSink);
         }
 
-        // Network sink
         if (this->config.networkAdapter) {
-            auto networkSink = std::make_shared<NetworkSink>(config.networkAdapter);
+            auto networkSink = std::make_shared<NetworkSink>(this->config.networkAdapter);
             networkSink->set_pattern("%v");
             sinks.push_back(networkSink);
         }
 
-        // Create logger (sync or async)
         if (this->config.asyncMode == Mode::Async) {
-            spdlog::init_thread_pool(config.asyncQueueSize, config.asyncThreadCount);
+            spdlog::init_thread_pool(this->config.asyncQueueSize, this->config.asyncThreadCount);
             this->logger = std::make_shared<spdlog::async_logger>(
                 "async_logger", sinks.begin(), sinks.end(), spdlog::thread_pool(),
                 spdlog::async_overflow_policy::block);
@@ -281,6 +373,9 @@ private:
         this->logger->set_level(spdlog::level::trace);
     }
 
+    /// [Logging Implementation]
+
+    /// @brief Formats and dispatches a log message at the given level
     void log(LogLevel level, const std::string & message, const std::source_location & location)
     {
         if (static_cast<int>(this->level) > static_cast<int>(level)) {
@@ -291,106 +386,157 @@ private:
             return;
         }
 
-        std::string formatted_msg;
+        auto formattedMessage = std::string();
 
-        if (config.format == OutputFormat::Json) {
-            formatted_msg = this->formatJson(level, message, location);
+        if (this->config.format == OutputFormat::Json) {
+            formattedMessage = this->formatJson(level, message, location);
         } else {
-            formatted_msg = this->formatTerminal(level, message, location);
+            formattedMessage = this->formatTerminal(level, message, location);
         }
 
-        this->logger->log(this->toSpdlogLevel(level), formatted_msg);
+        this->logger->log(Logger::toSpdlogLevel(level), formattedMessage);
     }
 
+    /// [Formatting]
+
+    /// @brief Formats a log entry as a JSON string
     std::string formatJson(LogLevel level, const std::string & message,
                            const std::source_location & location)
     {
-        nlohmann::json log_entry;
+        auto logEntry = nlohmann::json();
 
         if (this->config.fields.includeTime) {
-            log_entry["time"] = this->getCurrentTimeString();
+            logEntry["time"] = Logger::getCurrentTimeString();
         }
         if (this->config.fields.includeAppName) {
             if (!this->context.appName.empty()) {
-                log_entry["app"] = this->context.appName;
+                logEntry["app"] = this->context.appName;
             }
         }
         if (this->config.fields.includeProcessId) {
-            log_entry["process_id"] = std::to_string(this->processId);
+            logEntry["process_id"] = std::to_string(this->processId);
         }
         if (this->config.fields.includeThreadId) {
-            log_entry["thread_id"] = this->getThreadId();
+            logEntry["thread_id"] = Logger::getThreadId();
         }
         if (this->config.fields.includeModuleName) {
             if (!this->context.moduleName.empty()) {
-                log_entry["module"] = this->context.moduleName;
+                logEntry["module"] = this->context.moduleName;
             }
         }
         if (this->config.fields.includeLogLevel) {
-            log_entry["level"] = this->levelToString(level);
+            logEntry["level"] = Logger::levelToString(level);
         }
         if (this->config.fields.includeFile) {
-            log_entry["file"] = this->formatFileLine(location);
+            logEntry["file"] = Logger::formatFileLine(location);
         }
         if (this->config.fields.includeMessage) {
-            log_entry["message"] = message;
+            logEntry["message"] = message;
         }
 
-        return log_entry.dump();
+        return logEntry.dump();
     }
 
+    /// @brief Formats a log entry as a human-readable terminal string
     std::string formatTerminal(LogLevel level, const std::string & message,
                                const std::source_location & location)
     {
-        std::ostringstream oss;
+        auto output = std::ostringstream();
+        const auto colored = this->useColors();
 
-        auto section = [](const std::string & content) { return "[" + content + "]"; };
+        const auto section = [](const std::string & content) { return "[" + content + "]"; };
+
+        if (colored) {
+            output << AnsiColor::WarmTint;
+        }
 
         if (this->config.fields.includeTime) {
-            oss << section(this->getCurrentTimeString());
+            output << section(Logger::getCurrentTimeString());
         }
         if (this->config.fields.includeAppName) {
             if (!this->context.appName.empty()) {
-                oss << section(this->context.appName);
+                output << section(this->context.appName);
             }
         }
         if (this->config.fields.includeModuleName) {
             if (!this->context.moduleName.empty()) {
-                oss << section(this->context.moduleName);
+                output << section(this->context.moduleName);
             }
         }
         if (this->config.fields.includeProcessId) {
-            oss << section("PID:" + std::to_string(this->processId));
+            output << section("PID:" + std::to_string(this->processId));
         }
         if (this->config.fields.includeThreadId) {
-            oss << section("TID:" + this->getThreadId());
+            output << section("TID:" + Logger::getThreadId());
         }
         if (this->config.fields.includeLogLevel) {
-            oss << section(this->levelToString(level));
+            const auto levelText = Logger::levelToString(level);
+            if (colored) {
+                output << "[" << Logger::levelToColor(level) << levelText << AnsiColor::Reset
+                       << AnsiColor::WarmTint << "]";
+            } else {
+                output << section(levelText);
+            }
         }
         if (this->config.fields.includeFile) {
-            oss << section(this->formatFileLine(location));
+            output << section(Logger::formatFileLine(location));
         }
         if (this->config.fields.includeMessage) {
-            oss << " " << message;
+            output << " " << message;
         }
 
-        return oss.str();
+        if (colored) {
+            output << AnsiColor::Reset;
+        }
+
+        return output.str();
     }
 
+    /// [Utility]
+
+    /// @brief Returns whether coloring should be applied to terminal output
+    bool useColors() const
+    {
+        return this->config.enableColors && this->config.format == OutputFormat::Terminal &&
+               this->config.logToConsole;
+    }
+
+    /// @brief Returns the ANSI color escape code for a given log level
+    static const char * levelToColor(LogLevel level)
+    {
+        switch (level) {
+            case LogLevel::Trace:
+                return AnsiColor::Trace;
+            case LogLevel::Debug:
+                return AnsiColor::Debug;
+            case LogLevel::Info:
+                return AnsiColor::Info;
+            case LogLevel::Warning:
+                return AnsiColor::Warning;
+            case LogLevel::Error:
+                return AnsiColor::Error;
+            case LogLevel::Critical:
+                return AnsiColor::Critical;
+            default:
+                return AnsiColor::Info;
+        }
+    }
+
+    /// @brief Extracts filename and line number from a source location
     static std::string formatFileLine(const std::source_location & location)
     {
-        std::string file = location.file_name();
-        size_t pos1 = file.find_last_of("/\\");
-        if (pos1 != std::string::npos) {
-            file = file.substr(pos1 + 1);
+        auto file = std::string(location.file_name());
+        const auto position = file.find_last_of("/\\");
+        if (position != std::string::npos) {
+            file = file.substr(position + 1);
         }
-        std::ostringstream file_line;
-        file_line << file;
-        file_line << ":" << location.line();
-        return file_line.str();
+
+        auto fileLine = std::ostringstream();
+        fileLine << file << ":" << location.line();
+        return fileLine.str();
     }
 
+    /// @brief Converts a LogLevel to its short string representation
     static std::string levelToString(LogLevel level)
     {
         switch (level) {
@@ -411,6 +557,7 @@ private:
         }
     }
 
+    /// @brief Converts a LogLevel to the corresponding spdlog level
     static spdlog::level::level_enum toSpdlogLevel(LogLevel level)
     {
         switch (level) {
@@ -433,6 +580,7 @@ private:
         }
     }
 
+    /// @brief Returns the current process ID
     static int getProcessId()
     {
 #ifdef _WIN32
@@ -442,59 +590,78 @@ private:
 #endif
     }
 
+    /// @brief Returns the current thread ID as a string
     static std::string getThreadId()
     {
-        std::ostringstream oss;
-        oss << std::this_thread::get_id();
-        return oss.str();
+        auto output = std::ostringstream();
+        output << std::this_thread::get_id();
+        return output.str();
     }
 
+    /// @brief Returns the current timestamp as a formatted string
     static std::string getCurrentTimeString()
     {
-        using namespace std::chrono;
-        auto now = system_clock::now();
-        auto ms = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
-        auto in_time_t = system_clock::to_time_t(now);
+        const auto now = std::chrono::system_clock::now();
+        const auto milliseconds =
+            std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) %
+            MillisecondsDivisor;
+        const auto timeValue = std::chrono::system_clock::to_time_t(now);
 
-        std::ostringstream oss;
-        oss << std::put_time(std::localtime(&in_time_t), "%Y-%m-%d %H:%M:%S");
-        oss << '.' << std::setfill('0') << std::setw(3) << ms.count();
-        return oss.str();
+        auto output = std::ostringstream();
+        output << std::put_time(std::localtime(&timeValue), "%Y-%m-%d %H:%M:%S");
+        output << '.' << std::setfill('0') << std::setw(MillisecondsFieldWidth)
+               << milliseconds.count();
+        return output.str();
     }
+
+#pragma endregion
+
+    /// [Properties]
+
+    /// @brief Current minimum log level
+    LogLevel level = LogLevel::Trace;
+    /// @brief Underlying spdlog logger instance
+    std::shared_ptr<spdlog::logger> logger = nullptr;
+    /// @brief Logger configuration
+    Config config;
+    /// @brief Logger context with app and module names
+    Context context;
+    /// @brief Cached process ID
+    int processId = 0;
 };
 
+/// @brief Creates a default logger configuration for terminal output
 inline Logger::Config MakeDefaultLoggerConfig()
 {
-    Logger::Config config;
+    auto config = Logger::Config();
     config.format = OutputFormat::Terminal;
-    config.fields = LogFieldConfig{ 
-        .includeAppName = true,
-        .includeProcessId = false,
-        .includeThreadId = false,
-        .includeModuleName = true,
-        .includeLogLevel = true,
-        .includeFile = true,
-        .includeMessage = true,
-        .includeTime = false 
-    };
+    config.fields = LogFieldConfig{ .includeAppName = true,
+                                    .includeProcessId = false,
+                                    .includeThreadId = false,
+                                    .includeModuleName = true,
+                                    .includeLogLevel = true,
+                                    .includeFile = true,
+                                    .includeMessage = true,
+                                    .includeTime = false };
     config.asyncMode = Logger::Mode::Sync;
     config.logToConsole = true;
     config.logFilePath = std::nullopt;
     config.networkAdapter = nullptr;
-    config.asyncQueueSize = 8192;
-    config.asyncThreadCount = 1;
+    config.asyncQueueSize = DefaultAsyncQueueSize;
+    config.asyncThreadCount = DefaultAsyncThreadCount;
     return config;
 }
 
-inline Logger CreateLogger(const std::string& appName, const std::string& moduleName)
+/// @brief Creates a Logger with default terminal configuration and given app/module names
+inline LoggerPtr CreateLogger(const std::string & appName, const std::string & moduleName)
 {
-    auto defaultConfig = MakeDefaultLoggerConfig();
-    
-    Logger::Context context;
+    const auto defaultConfig = MakeDefaultLoggerConfig();
+
+    auto context = Logger::Context();
     context.appName = appName;
     context.moduleName = moduleName;
-    
-    return Logger(defaultConfig, context);
+
+    return Logger::Create(defaultConfig, context);
 }
 
 }  // namespace kvalog
