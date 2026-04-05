@@ -9,75 +9,164 @@
   <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT License"/>
 </p>
 
-A modern, header-only C++ logging library built on top of spdlog with flexible configuration and multiple output formats and targets.
+Header-only C++ logging library built on top of spdlog with flexible configuration and multiple output formats and targets.
 
 ## Features
 
 - **Header-only**: Single header file for easy integration
+- **Logging profiles**: Predefined configurations for common use cases
+- **Formatted messages**: `fmt`-style format strings with automatic source location capture
 - **Multiple output formats**: JSON and terminal-friendly formats
+- **Colored terminal output**: Per-level coloring with opt-in configuration
 - **Flexible field configuration**: Enable/disable any log field at runtime
 - **Multiple sinks**: Console, file, and network logging
 - **Network adapters**: Interface-based design for HTTP, gRPC, or custom protocols
 - **Synchronous and asynchronous modes**: Choose based on performance needs
 - **Thread-safe**: Safe to use from multiple threads
-- **Modern C++20**: Uses `std::source_location` for automatic file/line capture
 - **No macros needed**: Clean API without preprocessor magic
 
 ## Requirements
 
 - C++20 or later
-- [spdlog](https://github.com/gabime/spdlog) library
-- [nlohmann/json](https://github.com/nlohmann/json) library
+- [spdlog](https://github.com/gabime/spdlog) library (if using without vcpkg)
+- [nlohmann/json](https://github.com/nlohmann/json) library (if using without vcpkg)
 
 ## Installation
 
-### Using CMake
+Kvalog is supported via vcpkg and can be added as overlay port from custom [fogesque vcpkg overlay ports](https://github.com/fogesque/vcpkg-ports).
+
+### Using CMake With vcpkg Toolchain
 
 ```cmake
-find_package(spdlog REQUIRED)
-find_package(nlohmann_json REQUIRED)
+find_package(kvalog REQUIRED)
 
 add_executable(your_app main.cpp)
 target_link_libraries(your_app PRIVATE 
-    spdlog::spdlog 
-    nlohmann_json::nlohmann_json
+    kvalog::kvalog 
 )
-target_include_directories(your_app PRIVATE /path/to/kvalog)
 ```
 
 ### Using vcpkg
 
 ```bash
-vcpkg install spdlog nlohmann-json
+vcpkg install kvalog
 ```
 
 ## Quick Start
 
 ```cpp
-#include "kvalog.hpp"
+#include <kvalog/kvalog.hpp>
 
-using namespace kvalog;
+int main()
+{
+    // Create a logger with a profile
+    const auto context = kvalog::Logger::Context{ .appName = "MyApp", .moduleName = "Main" };
+    auto logger = kvalog::CreateLogger(kvalog::LogProfile::ColoredDefault, context);
 
-int main() {
-    // Create logger configuration
-    Logger::Config config;
-    config.format = OutputFormat::Terminal;
-    config.logToConsole = true;
+    // Plain messages
+    logger->Info("Application started");
 
-    // Set up context
-    Logger::Context context;
-    context.appName = "MyApp";
-    context.moduleName = "NetworkModule";
+    // Formatted messages with arguments
+    logger->Info("User '{}' logged in from {}", "alice", "192.168.1.42");
+    logger->Warning("Cache miss rate: {:.1f}%", 12.5);
+    logger->Error("Connection to {} failed after {} retries", "db-primary", 3);
 
-    // Create logger instance
-    Logger logger(config, context);
-    
-    // Log messages
-    logger.info("Connection established");
-    logger.error("Query failed");
-    
     return 0;
 }
+```
+
+## Logging Profiles
+
+Profiles are predefined configurations for common use cases. Use `CreateLogger` with a `LogProfile` to get started quickly:
+
+```cpp
+const auto context = kvalog::Logger::Context{ .appName = "MyApp", .moduleName = "Auth" };
+auto logger = kvalog::CreateLogger(kvalog::LogProfile::ColoredDefault, context);
+```
+
+### Available Profiles
+
+| Profile | Format | Colors | Time | PID/TID | File | Description |
+|---|---|---|---|---|---|---|
+| `Minimal` | Terminal | No | No | No | No | Least noise, just app + level + message |
+| `Default` | Terminal | No | No | No | Yes | Balanced everyday output |
+| `Detailed` | Terminal | No | Yes | No | Yes | Timestamps without process/thread IDs |
+| `Verbose` | Terminal | No | Yes | Yes | Yes | Full diagnostics with all fields |
+| `ColoredDefault` | Terminal | Yes | No | No | Yes | Default with colored level tags |
+| `ColoredDetailed` | Terminal | Yes | Yes | No | Yes | Detailed with colored level tags |
+| `ColoredVerbose` | Terminal | Yes | Yes | Yes | Yes | Verbose with colored level tags |
+| `Json` | JSON | No | Yes | Yes | Yes | Structured JSON for log aggregation |
+
+### Profile Output Examples
+
+**Minimal**
+```
+[MyApp][INF] Application started
+```
+
+**Default**
+```
+[MyApp][Auth][INF][main.cpp:42] Application started
+```
+
+**Detailed**
+```
+[2025-10-06 21:58:46.529][MyApp][Auth][INF][main.cpp:42] Application started
+```
+
+**Verbose**
+```
+[2025-10-06 21:58:46.529][MyApp][Auth][PID:12345][TID:12345][INF][main.cpp:42] Application started
+```
+
+**ColoredDefault** / **ColoredDetailed** / **ColoredVerbose**
+
+Same layout as their non-colored counterparts, but with bright white text and per-level colored tags:
+- `TRC` light velvet
+- `DBG` light cyan
+- `INF` light blue
+- `WRN` yellow
+- `ERR` red
+- `CRT` bold red
+
+**Json**
+```json
+{"app":"MyApp","file":"main.cpp:42","level":"INF","message":"Application started","module":"Auth","process_id":"12345","thread_id":"12345","time":"2025-10-06 21:58:46.529"}
+```
+
+### Custom Configuration
+
+If profiles don't fit your needs, create a `Logger::Config` directly:
+
+```cpp
+auto config = kvalog::Logger::Config();
+config.format = kvalog::OutputFormat::Terminal;
+config.logToConsole = true;
+config.enableColors = true;
+config.logFilePath = "/var/log/myapp.log";
+config.fields.includeProcessId = false;
+config.fields.includeThreadId = false;
+config.fields.includeTime = true;
+
+const auto context = kvalog::Logger::Context{ .appName = "MyApp", .moduleName = "Main" };
+auto logger = kvalog::Logger::Create(config, context);
+```
+
+## Formatted Messages
+
+Logging methods accept `fmt`-style format strings with variadic arguments. Source location is captured automatically at the call site.
+
+```cpp
+auto logger = kvalog::CreateLogger(kvalog::LogProfile::Default, context);
+
+// Plain string
+logger->Info("Server started");
+
+// Format arguments
+logger->Info("Listening on {}:{}", "0.0.0.0", 8080);
+logger->Debug("Request handled in {:.2f}ms", 3.14);
+logger->Warning("Disk usage at {}%", 95);
+logger->Error("Failed to parse config: {}", errorMessage);
 ```
 
 ## Configuration
@@ -87,38 +176,17 @@ int main() {
 All fields are enabled by default and can be toggled at runtime:
 
 ```cpp
-LogFieldConfig fields;
-fields.includeAppName = true;      // Application name
-fields.includeProcessId = true;    // Process ID
-fields.includeThreadId = true;     // Thread ID
-fields.includeModuleName = true;   // Module name (some part of application)
-fields.includeLogLevel = true;     // Log level
-fields.includeFile = true;         // Source file name and line
-fields.includeMessage = true;      // Log message
-fields.includeTime = true;         // Time
+kvalog::LogFieldConfig fields;
+fields.includeAppName = true;
+fields.includeProcessId = true;
+fields.includeThreadId = true;
+fields.includeModuleName = true;
+fields.includeLogLevel = true;
+fields.includeFile = true;
+fields.includeMessage = true;
+fields.includeTime = true;
 
 config.fields = fields;
-```
-
-### Output Formats
-
-#### Terminal Format
-```
-[2025-10-06 21:58:46.529][MyApp][NetworkModule][PID:12345][TID:67890][INF][main.cpp:42] Connection established
-```
-
-#### JSON Format
-```json
-{
-  "app":        "MyApp",
-  "process_id": "12345",
-  "thread_id":  "67890",
-  "module":     "NetworkModule",
-  "level":      "INF",
-  "file":       "main.cpp:42",
-  "message":    "Connection established",
-  "time":       "2025-10-06 21:58:46.529"
-}
 ```
 
 ### Output Destinations
@@ -135,20 +203,24 @@ config.logFilePath = "/var/log/myapp.log";
 
 #### Network Logging
 
-Implement the `NetworkSinkInterface` interface:
+Implement the `INetworkSink` interface:
 
 ```cpp
-class HttpAdapter : public NetworkSinkInterface {
+class HttpAdapter : public kvalog::INetworkSink
+{
 public:
-    void sendLog(const std::string& jsonLog) override {
+    void SendLog(const std::string & jsonLog) override
+    {
         // Send JSON log via HTTP POST
     }
-    
-    bool isConnected() const override {
+
+    bool IsConnected() const override
+    {
         return this->connected;
     }
+
 private:
-    bool connected;
+    bool connected = false;
 };
 
 auto adapter = std::make_shared<HttpAdapter>();
@@ -159,142 +231,91 @@ config.networkAdapter = adapter;
 
 #### Synchronous (default)
 ```cpp
-config.asyncMode = Logger::Mode::Sync;
+config.asyncMode = kvalog::Logger::Mode::Sync;
 ```
 
-#### Asynchronous (better performance)
+#### Asynchronous
 ```cpp
-config.asyncMode = Logger::Mode::Async;
-config.asyncQueueSize = 8192;        // Queue size
-config.asyncThreadCount = 4;         // Background threads
+config.asyncMode = kvalog::Logger::Mode::Async;
+config.asyncQueueSize = 8192;
+config.asyncThreadCount = 4;
 ```
 
 ## Usage Examples
 
-### Basic Logging
-
-```cpp
-Logger::Config config;
-config.format = OutputFormat::Terminal;
-config.logToConsole = true;
-
-Logger::Context context;
-context.appName = "WebServer";
-context.moduleName = "Responder";
-
-Logger logger(config, context);
-
-logger.trace("Routing request");
-logger.debug("Validating token");
-logger.info("Processing request");
-logger.warning("Cache miss");
-logger.error("Connection timeout");
-logger.critical("Out of memory");
-```
-
-### Runtime Field Configuration
-
-```cpp
-Logger logger(config);
-logger.info("With all fields");
-
-// Disable some fields
-LogFieldConfig minimal;
-minimal.includeProcessId = false;
-minimal.includeThreadId = false;
-minimal.includeFile = false;
-
-logger.setFieldConfig(minimal);
-logger.info("With minimal fields");
-```
-
 ### Multiple Logger Instances
 
 ```cpp
-// Main application logger
-Logger::Config mainConfig;
-Logger::Context mainContext;
-mainContext.appName = "MainService";
-Logger mainLogger(mainConfig, mainContext);
+const auto mainContext = kvalog::Logger::Context{ .appName = "MainService", .moduleName = "Core" };
+auto mainLogger = kvalog::CreateLogger(kvalog::LogProfile::ColoredDefault, mainContext);
 
 // Create subsystem logger with inherited config
-Logger::Context dbContext;
-dbContext.appName = "DatabaseService";
-Logger dbLogger = Logger::WithConfigFrom(mainLogger, dbContext);
-Logger::Context apiContext;
-apiContext.appName = "ApiService";
-Logger apiLogger = Logger::WithConfigFrom(mainLogger, apiContext);
+const auto dbContext = kvalog::Logger::Context{ .appName = "MainService", .moduleName = "Database" };
+auto dbLogger = kvalog::Logger::WithConfigFrom(*mainLogger, dbContext);
 
-mainLogger.info("Application started");
-dbLogger.info("Database connected");
-apiLogger.info("API server listening");
-```
-
-### Multi-threaded Async Logging
-
-```cpp
-Logger::Config config;
-config.asyncMode = Logger::Mode::Async;
-config.asyncQueueSize = 16384;
-config.asyncThreadCount = 2;
-
-Logger::Context ctx;
-ctx.appName = "WorkerService";
-
-Logger logger(config, ctx);
-
-// Launch multiple worker threads
-std::vector<std::thread> workers;
-for (int i = 0; i < 10; ++i) {
-    workers.emplace_back([&logger, i]() {
-        for (int j = 0; j < 1000; ++j) {
-            logger.info("Worker" + std::to_string(i) + 
-                       "is processing item" + std::to_string(j));
-        }
-    });
-}
-
-for (auto & t : workers) {
-    t.join();
-}
-
-logger.flush(); // Ensure all logs are written
-```
-
-### Network Logging with Multiple Adapters
-
-```cpp
-class GrpcLogAdapter : public NetworkSinkInterface {
-public:
-    void sendLog(const std::string & jsonLog) override {
-        // Send JSON log via gRPC
-    }
-    bool isConnected() const override {
-        return true;
-    }
-};
-
-config.networkAdapter = std::make_shared<GrpcLogAdapter>();
-Logger logger(config);
+mainLogger->Info("Application started");
+dbLogger->Info("Database connected");
 ```
 
 ### Setting Log Levels
 
 ```cpp
-Logger logger(config);
+auto logger = kvalog::CreateLogger(kvalog::LogProfile::Default, context);
 
-// Set minimum log level
-logger.setLevel(LogLevel::Warning);
+logger->SetLevel(kvalog::LogLevel::Warning);
 
 // These won't be logged
-logger.trace("Not shown");
-logger.debug("Not shown");
-logger.info("Not shown");
+logger->Trace("Not shown");
+logger->Debug("Not shown");
+logger->Info("Not shown");
 
 // These will be logged
-logger.warning("Shown");
-logger.error("Shown");
-logger.critical("Shown");
+logger->Warning("Shown");
+logger->Error("Shown");
+logger->Critical("Shown");
+```
+
+### Runtime Field Configuration
+
+```cpp
+auto logger = kvalog::CreateLogger(kvalog::LogProfile::Verbose, context);
+logger->Info("With all fields");
+
+// Disable some fields at runtime
+auto minimal = kvalog::LogFieldConfig();
+minimal.includeProcessId = false;
+minimal.includeThreadId = false;
+minimal.includeFile = false;
+
+logger->SetFieldConfig(minimal);
+logger->Info("With minimal fields");
+```
+
+### Multi-threaded Async Logging
+
+```cpp
+auto config = kvalog::MakeProfileConfig(kvalog::LogProfile::Verbose);
+config.asyncMode = kvalog::Logger::Mode::Async;
+config.asyncQueueSize = 16384;
+config.asyncThreadCount = 2;
+
+const auto context = kvalog::Logger::Context{ .appName = "WorkerService", .moduleName = "Pool" };
+auto logger = kvalog::Logger::Create(config, context);
+
+auto workers = std::vector<std::thread>();
+for (int i = 0; i < 10; ++i) {
+    workers.emplace_back([&logger, i]() {
+        for (int j = 0; j < 1000; ++j) {
+            logger->Info("Worker {} processing item {}", i, j);
+        }
+    });
+}
+
+for (auto & worker : workers) {
+    worker.join();
+}
+
+logger->Flush();
 ```
 
 ## Performance Considerations
@@ -319,11 +340,10 @@ logger.critical("Shown");
 The logger is fully thread-safe. Multiple threads can log simultaneously without additional synchronization:
 
 ```cpp
-Logger logger(config);
+auto logger = kvalog::CreateLogger(kvalog::LogProfile::Default, context);
 
-// Safe from multiple threads
-std::thread t1([&]() { logger.info("Message 1"); });
-std::thread t2([&]() { logger.info("Message 2"); });
+auto t1 = std::thread([&]() { logger->Info("Message from thread 1"); });
+auto t2 = std::thread([&]() { logger->Info("Message from thread 2"); });
 
 t1.join();
 t2.join();
@@ -331,45 +351,78 @@ t2.join();
 
 ## Best Practices
 
-1. **Module naming**: Use consistent module names across your codebase
-2. **Config reuse**: Create logger instances with `WithConfigFrom()` for consistency
-3. **Async for performance**: Use async mode in production for better performance
-4. **Flush on shutdown**: Always call `flush()` before application exit
-5. **Network error handling**: Implement robust error handling in network adapters
-6. **Log levels**: Use appropriate log levels (don't log everything as INFO)
+1. **Use profiles**: Start with a profile and customize only if needed
+2. **Module naming**: Use consistent module names across your codebase
+3. **Config reuse**: Create logger instances with `WithConfigFrom()` for consistency
+4. **Async for production**: Use async mode in production for better performance
+5. **Flush on shutdown**: Always call `Flush()` before application exit
+6. **Network error handling**: Implement robust error handling in network adapters
+7. **Log levels**: Use appropriate log levels (don't log everything as Info)
 
 ## API Reference
+
+### LogProfile
+
+```cpp
+enum class LogProfile {
+    Minimal,          // App + level + message
+    Default,          // + module + file
+    Detailed,         // + timestamps
+    Verbose,          // + PID/TID
+    ColoredDefault,   // Default with colors
+    ColoredDetailed,  // Detailed with colors
+    ColoredVerbose,   // Verbose with colors
+    Json              // Structured JSON output
+};
+```
 
 ### Logger::Config
 
 ```cpp
 struct Config {
-    OutputFormat format;                       // Json or Terminal
-    LogFieldConfig fields;                     // Field configuration
-    Mode asyncMode;                            // Sync or async logging
-    bool logToConsole;                         // Enable console output
-    std::optional<std::string> logFilePath;    // File path (optional)
-    std::shared_ptr<NetworkSinkInterface> networkAdapter; // Network adapter (optional)
-    size_t asyncQueueSize;                     // Async queue size
-    size_t asyncThreadCount;                   // Async thread count
+    OutputFormat format;                          // Json or Terminal
+    LogFieldConfig fields;                        // Field configuration
+    Mode asyncMode;                               // Sync or Async
+    bool logToConsole;                            // Enable console output
+    bool enableColors;                            // Enable colored level tags (terminal only)
+    std::optional<std::string> logFilePath;       // File path (optional)
+    std::shared_ptr<INetworkSink> networkAdapter; // Network adapter (optional)
+    std::size_t asyncQueueSize;                   // Async queue size
+    std::size_t asyncThreadCount;                 // Async thread count
 };
 ```
 
 ### Logger Methods
 
 ```cpp
-void trace(const std::string& message);
-void debug(const std::string& message);
-void info(const std::string& message);
-void warning(const std::string& message);
-void error(const std::string& message);
-void critical(const std::string& message);
+// Logging (accept fmt-style format strings)
+void Trace(FormatString format, Args &&... args);
+void Debug(FormatString format, Args &&... args);
+void Info(FormatString format, Args &&... args);
+void Warning(FormatString format, Args &&... args);
+void Error(FormatString format, Args &&... args);
+void Critical(FormatString format, Args &&... args);
 
-void flush();
+// Configuration
+void SetLevel(LogLevel level);
+void SetFieldConfig(const LogFieldConfig & fields);
+void SetOutputFormat(OutputFormat format);
+void Flush();
 
-void setLevel(LogLevel level);
-void setFieldConfig(const LogFieldConfig& fields);
-void setOutputFormat(OutputFormat format);
+// Fabric methods
+static LoggerPtr Create(const Config & config);
+static LoggerPtr Create(const Config & config, const Context & context);
+static Logger WithConfigFrom(const Logger & source, const Context & newContext);
+```
+
+### Free Functions
+
+```cpp
+// Create logger from a profile
+LoggerPtr CreateLogger(LogProfile profile, const Logger::Context & context);
+
+// Get a profile's config for further customization
+Logger::Config MakeProfileConfig(LogProfile profile);
 ```
 
 ## Summary
